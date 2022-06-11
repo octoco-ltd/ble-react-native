@@ -35,11 +35,16 @@ to sample our data and stream the reading to our application in real time.
 ## React Native Application
 Now that we have our basic BLE server running, let's build our client React application.
 For this project, we will be using Expo to manage our application. 
+
 ### Step 1: Initialize the project
 To get started, create a new folder for the project and name it *ble-react-native*. You may
 also use an alternative name if you wish.
-Within this new folder, open a terminal or command line to initialize the project
+Within this new folder, open a terminal or command window to initialize the project
 using the official [Expo TypeScript template](https://docs.expo.dev/guides/typescript/#starting-from-scratch-using-a-typescript-template)
-Do to this, simply type `expo init -t expo-template-blank-typescript` in the terminal and
-run the command. When prompted to give your project a name you can use any name you prefer,
-for this project the name will be *ble-react-native*
+To do this, simply type `expo init -t expo-template-blank-typescript` in the terminal and
+run the command. When prompted to give your project a name you can use any name that you 
+prefer - for this project the name will be *ble-react-native*. 
+Once the project is created, open the project folder in your IDE of choice.
+
+### Step 2 Scaffolding 
+Let's create some folders. 
