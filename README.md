@@ -47,4 +47,27 @@ prefer - for this project the name will be *ble-react-native*.
 Once the project is created, open the project folder in your IDE of choice.
 
 ### Step 2 Scaffolding 
-Let's create some folders. 
+Let's create some folders. Within the project root, create the following folder, if they
+do not exist already:
+
+```
+.
+├── assets                     # Images, fonts, sounds and other assets
+│
+├── components                 # Components reused on different screens
+│   └── buttons                # Button components
+|
+├── constants                  # Main app screens we navigate between
+|
+├── navigation                 # React Navigation controllers
+|
+├── screens                    # Main app screens we navigate between
+│   └── weight                 # Weight tracking screen
+|
+├── store                      # Redux store
+│   └── slices                 # Slices for different states
+|
+├── package.json               # Node module dependencies
+|
+└── tsconfig.json              # TypeScript compiler options
+```
