@@ -46,28 +46,93 @@ run the command. When prompted to give your project a name you can use any name 
 prefer - for this project the name will be *ble-react-native*. 
 Once the project is created, open the project folder in your IDE of choice.
 
-### Step 2 Scaffolding 
-Let's create some folders. Within the project root, create the following folder, if they
-do not exist already:
+### Step 2: Libraries
+Because bluetooth functionality is not included within the Expo Go client by default,
+we need to build our own development client to use BLE functionality - described
+in the next section. The downside of this is that we need to rebuild the dev client
+every time we add new native libraries. To avoid this, let's add all the libraries
+that we will require before building the dev client. For this project we will be using
+the following libraries:
 
+#### [react-native-ble-plx](https://github.com/dotintent/react-native-ble-plx)
+Library used to manage our BLE functionality.
+```
+expo add react-native-ble-plx @config-plugins/react-native-ble-plx expo-dev-client
+```
+
+#### [expo-location](https://docs.expo.dev/versions/latest/sdk/location/)
+Location permissions are required to use BLE.
+```
+expo install expo-location
+```
+
+#### [React Navigation](https://reactnavigation.org/)
+Used for our navigation and bottom tabs.
+```
+yarn add @react-navigation/native @react-navigation/bottom-tabs @react-navigation/stack
+```
+```
+expo install react-native-screens react-native-safe-area-context
+```
+
+#### Others
+Finally, run the following to install the remaining libraries that we will use:
+```
+yarn add native-base
+```
+```
+expo install react-native-svg
+```
+
+### Step 3: Create custom dev client
+
+### Step 4 Scaffolding 
+Let's create some folders. Within the project root directory create the following folders, 
+if they do not exist already:
+
+- `components`
+- `constants`
+- `navigation`
+- `screens`
+- `store`
+- `utilities`
+
+Your project structure should now look similar to the tree below:
 ```
 .
 ├── assets                     # Images, fonts, sounds and other assets
 │
 ├── components                 # Components reused on different screens
-│   └── buttons                # Button components
 |
 ├── constants                  # Main app screens we navigate between
 |
 ├── navigation                 # React Navigation controllers
 |
 ├── screens                    # Main app screens we navigate between
-│   └── weight                 # Weight tracking screen
 |
 ├── store                      # Redux store
-│   └── slices                 # Slices for different states
+|
+├── utilities                  # App utility helpers
 |
 ├── package.json               # Node module dependencies
 |
 └── tsconfig.json              # TypeScript compiler options
 ```
+
+It will be useful to define some styles that we use throughout the app. Create a new
+file `globalStyles.ts` within the *constants* folder and paste the following code:
+
+@TODO paste globalStyles
+```
+```
+
+Now, on to our screens. This simple app will consist of 2 screens, in a bottom tab navigator:
+
+- Weight: Display the current live weight reading
+- BLE: Manage and connect to BLE device
+
+Within the *screens* folder we now create 2 new folders for our screens: 
+*weight* and *ble*. 
+
+Starting with the weight screen, within the *weight* directory, create a file
+`WeightScreen.tsx`.
