@@ -24,7 +24,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/app-icon.png",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "package": "com.octoco.blereactnative"
     },
     "web": {
       "favicon": "./assets/favicon.png"
