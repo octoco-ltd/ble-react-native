@@ -85,6 +85,20 @@ expo install react-native-svg
 ```
 
 ### Step 3: Create custom dev client
+Typical development using the default Expo Go application from the app store will not
+work for our BLE application, because the required bluetooth libraries are not shipped
+with the Expo Go app. Therefore, we need to build our own custom dev client.
+To get started, install the dev client library
+```
+expo install expo-dev-client
+```
+Now, add the import to the top of your `App.tsx` file:
+```
+import 'expo-dev-client';
+```
+Because the Expo ecosystem is rapidly evolving the further steps for creating our dev
+client are deferred to the [official Expo documentation](https://docs.expo.dev/development/getting-started/). 
+Simply follow the steps provided in the documentation according to your platform (iOS or Android).
 
 ### Step 4 Scaffolding 
 Let's create some folders. Within the project root directory create the following folders, 
