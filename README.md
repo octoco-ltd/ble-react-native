@@ -418,7 +418,22 @@ we have created, and it should look something like this:
 <img src="guide/assets/screenshot_1.jpg" style="align-self: center" height="500">
 
 #### Step 6: BLE Integration
-Now, for the main event, we will integrate the app with the BLE device. To ensure we have
+Now - for the main event - we will integrate the app with the BLE device. To ensure we have
 access to the BLE device from anywhere within the app, we will be managing the BLE 
-connections using Redux.
+connections using Redux. Create a new folder in the *store* directory named *ble* and within 
+it create the BLE slice file `bleSlice.ts` and slice interface file `bleSlice.contracts.ts`.
+I will explain some code snippets from our Redux implementation, but for now you can copy the 
+full code for each file from the [GitHub repository](https://github.com/octoco-ltd/ble-react-native).
+Your *store* directory should now have the following structure:
+
+```
+.
+├── store    
+|   ├── bleSlice.contracts.ts         
+│   └── bleSlice.ts           
+└── store.ts                
+```
+
+
+
 
