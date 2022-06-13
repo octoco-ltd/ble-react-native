@@ -48,6 +48,7 @@ const BLEManager = () => {
             setSubscriptions(prevState => [...prevState, subscription])
         }, true);
         return function cleanup() {
+            // Remove all subscriptions when manager unmounts
             subscriptions.map(_subscription => {
                 _subscription.remove();
                 return true;
@@ -57,6 +58,7 @@ const BLEManager = () => {
     }, []);
 
     useEffect(() => {
+        // Manage device connection changes
         checkDevices();
     }, [connectedDevice])
 

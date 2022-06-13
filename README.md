@@ -439,6 +439,7 @@ Your *store* directory should now have the following structure, with the complet
 
 Taking a look at the code in our `bleSlice.ts` file, we can see 3 `asyncThunks` (simply put, [thunks](https://redux-toolkit.js.org/api/createAsyncThunk) 
 are the recommended way to implement async functions in our redux slices, which can be dispatched):
+
 ```
 export const scanBleDevices = createAsyncThunk('ble/scanBleDevices', async (_, thunkAPI) => {
     try {
@@ -487,7 +488,7 @@ is used to extract the fields we are interested in before returning the object. 
 state in the Redux store.
 
 The final step to complete our Redux implementation is to wrap our application with the Redux 
-store provider in the `navigation/indtex.tsx` file:
+store provider in the `navigation/index.tsx` file:
 
 ```
 ...
@@ -507,6 +508,8 @@ export default function Providers() {
 
 To get the full benefits of TypeScript we will use 'typed' hooks, which we define in `hooks/hooks.ts`:
 
+<div style="text-align: center; font-weight: bold">hooks/hooks.ts</div>
+
 ```
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux'
 import type { RootState, AppDispatch } from '../store/store';
@@ -517,5 +520,124 @@ export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
 ```
 
 #### Step 7: The BLE component
+To simplify device and permission management, we will create an 'invisible' component that we name
+*BLEManager*. Even though this component will not have any visual elements, this component will 
+still be mounted once the app starts and stays mounted regardless of which screen we navigate to.
+Why do we need a component if we can't see it? Because we need certain functionality that can only
+be implemented by a mounted React component. If we do this in one of our screens, we will lose that 
+functionality once we navigate away from that screen. Of course, we can implement the required logic
+on every screen, but this leads to unnecessary duplication and messy state management. By placing
+this component in our `AppStack` at the same level as the `TabStack` this component will be mounted
+when the app starts and remain mounted throughout navigation lifecycles. 
 
+To explain this, let's implement the component and go through the code. In the *components* 
+directory, create the folder *BLEManager* and file `BLEManager.tsx`
 
+<div style="text-align: center; font-weight: bold">components/BLEManager/BLEManager.tsx</div>
+
+```
+// ==============================================
+// Void top-level component to manage BLE devices
+// ==============================================
+import React, { useEffect, useState } from 'react';
+import { BleManager, Device, Subscription } from 'react-native-ble-plx';
+import { useAppDispatch, useAppSelector } from '../../hooks/hooks';
+import {
+    disconnectDevice,
+    selectConnectedDevice,
+    setAdapterState,
+    setLocationPermissionStatus,
+} from '../../store/ble/bleSlice';
+import * as Location from 'expo-location';
+import { useToast } from 'native-base';
+import { globalStyles } from '../../constants/globalStyles';
+
+const bleManager = new BleManager();
+let device: Device;
+
+const BLEManager = () => {
+    const [subscriptions, setSubscriptions] = useState<Array<Subscription>>([]);
+    const connectedDevice = useAppSelector(selectConnectedDevice);
+    const dispatch = useAppDispatch();
+    const toast = useToast();
+
+    const disconnectCallback = () => {
+        console.log('BLEManager: disconnectCallback triggered');
+        if (connectedDevice) dispatch(disconnectDevice());
+        toast.show({
+            description: 'Disconnected from device',
+            ...globalStyles.toast.default,
+        });
+    }
+
+    const checkDevices = async () => {
+        if (connectedDevice && !device) {
+            console.log('BLEManager: Creating new device');
+            device = await bleManager.connectToDevice(connectedDevice.id);
+            const subscription = device.onDisconnected(disconnectCallback);
+            setSubscriptions(prevState => [...prevState, subscription])
+        }
+    }
+
+    // BLE Adapter State Manager
+    useEffect(() => {
+        const subscription = bleManager.onStateChange((state) => {
+            dispatch(setAdapterState({ adapterState: state }));
+            setSubscriptions(prevState => [...prevState, subscription])
+        }, true);
+        return function cleanup() {
+            // Remove all subscriptions when manager unmounts
+            subscriptions.map(_subscription => {
+                _subscription.remove();
+                return true;
+            });
+            setSubscriptions([]);
+        };
+    }, []);
+
+    useEffect(() => {
+        // Manage device connection changes
+        checkDevices();
+    }, [connectedDevice])
+
+    // Permissions manager
+    useEffect(() => {
+        (async () => {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            dispatch(setLocationPermissionStatus({ status }));
+        })();
+    }, []);
+
+    return null;
+};
+
+export default BLEManager;
+```
+
+The manager consists of 3 `useEffect` hooks. The first hook subscribes to the `bleManager.onStateChange`
+event. This allows us to update the state of the BLE network adapter in our Redux store. Tracking this
+state allows us to know, for example, whether bluetooth is available to make new connections.
+
+The second hook is fired whenever there is a change in the connected device state in our Redux store,
+such as when a device is connected or disconnected. This ensures that the device managed by the BLE
+library is in sync with the device details we have stored in Redux.
+
+The last hook checks whether the app has access to location permissions, a strict requirement for
+BLE functionality, and ask the user for permissions if they do not exist. This also updates the
+permissions state in the Redux store.
+
+To use this component, simply place it in the `AppStack`:
+
+<div style="text-align: center; font-weight: bold">navigation/AppStack.tsx</div>
+
+```
+...
+export const AppStack = () => {
+    return (
+        <SafeAreaView style={globalStyles.container.base}>
+            <BLEManager />
+            <TabStack />
+        </SafeAreaView>
+    );
+};
+```

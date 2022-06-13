@@ -6,6 +6,7 @@ import WeightScreen from '../screens/weight/WeightScreen';
 import { Icon } from 'native-base';
 import { MaterialIcons } from "@expo/vector-icons";
 import BLEScreen from '../screens/ble/BLEScreen';
+import BLEManager from '../components/BLEManager/BLEManager';
 
 const Tab = createBottomTabNavigator();
 
@@ -47,6 +48,7 @@ const TabStack = () => {
 export const AppStack = () => {
     return (
         <SafeAreaView style={globalStyles.container.base}>
+            <BLEManager />
             <TabStack />
         </SafeAreaView>
     );
