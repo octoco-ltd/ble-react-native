@@ -11,9 +11,9 @@ In this guide, we will be using an ESP32 microcontroller connected to an HX711 l
 amplifier to collect our live data - however any other type of sensor can be used with 
 minimal code adjustment. You can even do this tutorial without any external sensor and 
 simply sample values from the ADC. For the mobile application, we will be using React 
-Native (usingTypeScript) and the [react-native-ble-plx](https://dotintent.github.io/react-native-ble-plx/) library for bluetooth integration. 
-A link to the GitHub repo containing the final React Native code and C++ firmware is 
-provided at the end of this article.
+Native (usingTypeScript) and the [react-native-ble-plx](https://dotintent.github.io/react-native-ble-plx/) 
+library for bluetooth integration. A link to the GitHub repo containing the final React Native code and
+C++ firmware is provided at the end of this article.
 
 ## Requirements
 This guide will be kept as generic as possible to ensure that you can easily swap 
@@ -75,6 +75,12 @@ yarn add @react-navigation/native @react-navigation/bottom-tabs @react-navigatio
 expo install react-native-screens react-native-safe-area-context
 ```
 
+#### [react-redux](https://react-redux.js.org/)
+For global state management.
+```
+yarn add react-redux @reduxjs/toolkit
+```
+
 #### Others
 Finally, run the following to install the remaining libraries that we will use:
 ```
@@ -100,7 +106,7 @@ Because the Expo ecosystem is rapidly evolving the further steps for creating ou
 client are deferred to the [official Expo documentation](https://docs.expo.dev/development/getting-started/). 
 Simply follow the steps provided in the documentation according to your platform (iOS or Android).
 
-### Step 4 Scaffolding 
+### Step 4: Scaffolding 
 Let's create some folders. Within the project root directory create the following folders, 
 if they do not exist already:
 
@@ -136,8 +142,118 @@ Your project structure should now look similar to the tree below:
 It will be useful to define some styles that we use throughout the app. Create a new
 file `globalStyles.ts` within the *constants* folder and paste the following code:
 
-@TODO paste globalStyles
 ```
+import { StyleSheet } from 'react-native';
+import { Dimensions } from 'react-native';
+
+export const windowWidth = Dimensions.get('window').width;
+export const windowHeight = Dimensions.get('window').height;
+export const screenWidth = Dimensions.get('screen').width;
+export const screenHeight = Dimensions.get('screen').height;
+export const isSmallDevice = windowWidth < 400;
+
+export const containerStyles = StyleSheet.create({
+    base: {
+        flex: 1,
+        width: '100%',
+        height: '100%',
+    },
+    center: {
+        flex: 1,
+        width: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+    },
+    spacedBetween: {
+        flex: 1,
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+});
+
+export const divStyles = StyleSheet.create({
+    centered: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%'
+    },
+    row: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        flexDirection: 'row'
+    }
+});
+
+export const toastStyles = {
+    default: {
+        width: windowWidth / 1.2,
+        duration: 3000,
+        bottom: -20,
+    },
+};
+
+export const textStyles = StyleSheet.create({
+    p: {
+        fontSize: 14,
+    },
+    heading: {
+        fontSize: isSmallDevice ? 22 : 28,
+        fontWeight: 'bold'
+    },
+    error: {
+        color: '#fc6d47',
+        fontSize: 14,
+    },
+    emptyText: {
+        marginVertical: 15,
+        color: 'grey',
+        fontSize: isSmallDevice ? 16 : 22,
+        fontWeight: 'bold'
+    }
+});
+
+export const cardStyles = StyleSheet.create({
+    shadow: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'white',
+        borderRadius: 15,
+        shadowColor: 'grey',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 1,
+        shadowRadius: 8,
+        elevation: 8,
+        paddingLeft: 14,
+        paddingRight: 14,
+        marginTop: 6,
+        marginBottom: 6,
+        marginLeft: 16,
+        marginRight: 16,
+    }
+});
+
+export const globalStyles = {
+    card: {
+        ...cardStyles,
+    },
+    container: {
+        ...containerStyles,
+    },
+    div: {
+        ...divStyles
+    },
+    text: {
+        ...textStyles,
+    },
+    toast: {
+        ...toastStyles,
+    }
+};
+
 ```
 
 Now, on to our screens. This simple app will consist of 2 screens, in a bottom tab navigator:
@@ -149,4 +265,44 @@ Within the *screens* folder we now create 2 new folders for our screens:
 *weight* and *ble*. 
 
 Starting with the weight screen, within the *weight* directory, create a file
-`WeightScreen.tsx`.
+`WeightScreen.tsx` and paste the following code:
+
+```
+import React from 'react';
+import { Text, View } from 'react-native';
+import { globalStyles } from '../../constants/globalStyles';
+
+const WeightScreen = () => {
+    return (
+        <View style={globalStyles.container.spacedBetween}>
+            <Text>WeightScreen</Text>
+        </View>
+    );
+};
+
+export default WeightScreen;
+```
+
+Similarly, for the BLE screen, within the *ble* directory create a file
+`BLEScreen.tsx` and paste the following code:
+
+```
+import React from 'react';
+import { Text, View } from 'react-native';
+import { globalStyles } from '../../constants/globalStyles';
+
+const BLEScreen = () => {
+    return (
+        <View style={globalStyles.container.spacedBetween}>
+            <Text>BLEScreen</Text>
+        </View>
+    );
+};
+
+export default BLEScreen;
+```
+
+#### Step 5: Navigation
+Now that we have a basic skeleton for our app, we can set up the navigation. The navigator
+will consist of 2 bottom tabs, one for each screen. Create a new file, `index.tsx`, in 
+the *navigation* folder.

@@ -2,12 +2,12 @@ import React from 'react';
 import { Text, View } from 'react-native';
 import { globalStyles } from '../../constants/globalStyles';
 
-const WeightScreen = () => {
+const BLEScreen = () => {
     return (
         <View style={globalStyles.container.spacedBetween}>
-            <Text>WeightScreen</Text>
+            <Text>BLEScreen</Text>
         </View>
     );
 };
 
-export default WeightScreen;
+export default BLEScreen;
