@@ -5,6 +5,7 @@ import { appColors, globalStyles } from '../constants/globalStyles';
 import WeightScreen from '../screens/weight/WeightScreen';
 import { Icon } from 'native-base';
 import { MaterialIcons } from "@expo/vector-icons";
+import BLEScreen from '../screens/ble/BLEScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -28,7 +29,7 @@ const TabStack = () => {
                 />
                 <Tab.Screen
                     name={'ble'}
-                    component={WeightScreen}
+                    component={BLEScreen}
                     options={{
                         tabBarIcon: ({focused, color, size}) => {
                             return <Icon as={MaterialIcons} name="bluetooth" size={focused? 7 : 6} color={'white'}/>;

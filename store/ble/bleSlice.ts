@@ -1,7 +1,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { BleManager, Device } from 'react-native-ble-plx';
 import { RootState } from '../store';
-import { bleSliceInterface, NetworkState, toBLEDeviceVM } from './bleSlice.contracts';
+import { bleSliceInterface, connectDeviceByIdParams, NetworkState, toBLEDeviceVM } from './bleSlice.contracts';
 
 const bleManager = new BleManager();
 let device: Device;
@@ -26,10 +26,6 @@ export const scanBleDevices = createAsyncThunk('ble/scanBleDevices', async (_, t
         throw new Error(error.toString);
     }
 });
-
-interface connectDeviceByIdParams {
-    id: string
-}
 
 export const connectDeviceById = createAsyncThunk('ble/connectDeviceById', async (params: connectDeviceByIdParams, thunkAPI) => {
     const { id } = params;

@@ -53,6 +53,10 @@ export interface IDeviceScan {
     error: string;
 }
 
+export interface connectDeviceByIdParams {
+    id: string
+}
+
 export type IAdapterState =
 /**
  * The current state of the manager is unknown; an update is imminent.

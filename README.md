@@ -113,9 +113,9 @@ if they do not exist already:
 - `components`
 - `constants`
 - `navigation`
+- `hooks`
 - `screens`
 - `store`
-- `utilities`
 
 Your project structure should now look similar to the tree below:
 ```
@@ -128,11 +128,11 @@ Your project structure should now look similar to the tree below:
 |
 ├── navigation                 # React Navigation controllers
 |
+├── hooks                      # Custom hooks
+|
 ├── screens                    # Main app screens we navigate between
 |
 ├── store                      # Redux store
-|
-├── utilities                  # App utility helpers
 |
 ├── package.json               # Node module dependencies
 |
@@ -330,6 +330,7 @@ import { appColors, globalStyles } from '../constants/globalStyles';
 import WeightScreen from '../screens/weight/WeightScreen';
 import { Icon } from 'native-base';
 import { MaterialIcons } from "@expo/vector-icons";
+import BLEScreen from '../screens/ble/BLEScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -353,7 +354,7 @@ const TabStack = () => {
                 />
                 <Tab.Screen
                     name={'ble'}
-                    component={WeightScreen}
+                    component={BLEScreen}
                     options={{
                         tabBarIcon: ({focused, color, size}) => {
                             return <Icon as={MaterialIcons} name="bluetooth" size={focused? 7 : 6} color={'white'}/>;
@@ -424,7 +425,9 @@ connections using Redux. Create a new folder in the *store* directory named *ble
 it create the BLE slice file `bleSlice.ts` and slice interface file `bleSlice.contracts.ts`.
 I will explain some code snippets from our Redux implementation, but for now you can copy the 
 full code for each file from the [GitHub repository](https://github.com/octoco-ltd/ble-react-native).
-Your *store* directory should now have the following structure:
+Ensure that you also create the actual store file, `store.ts`, within the *store* directory and also
+copy the store configuration code from the repository.
+Your *store* directory should now have the following structure, with the completed code:
 
 ```
 .
@@ -434,6 +437,85 @@ Your *store* directory should now have the following structure:
 └── store.ts                
 ```
 
+Taking a look at the code in our `bleSlice.ts` file, we can see 3 `asyncThunks` (simply put, [thunks](https://redux-toolkit.js.org/api/createAsyncThunk) 
+are the recommended way to implement async functions in our redux slices, which can be dispatched):
+```
+export const scanBleDevices = createAsyncThunk('ble/scanBleDevices', async (_, thunkAPI) => {
+    try {
+        bleManager.startDeviceScan(null, null, async (error, scannedDevice) => {
+            if (error) {
+                console.log('startDeviceScan error: ', error);
+                throw new Error(error.toString());
+            }
+            if (scannedDevice && scannedDevice.name?.includes('BLE_SERVER')) {
+                thunkAPI.dispatch(addScannedDevice({ device: toBLEDeviceVM(scannedDevice) }));
+            }
+        });
+    } catch (error: any) {
+        throw new Error(error.toString);
+    }
+});
+```
+The `scanBleDevices` function will start the `startDeviceScan` subscription, which return a BLE
+device whenever it is detected. Thereafter, we compare the detected device name to our expected
+BLE server name (BLE_SERVER) and dispatch `addScannedDevice` to add the device to our store,
+along with other servers which may have the same name. 
 
+```
+export const connectDeviceById = createAsyncThunk('ble/connectDeviceById', async (params: connectDeviceByIdParams, thunkAPI) => {
+    const { id } = params;
+
+    try {
+        stopScan();
+        device = await bleManager.connectToDevice(id);
+        const deviceChars = await bleManager.discoverAllServicesAndCharacteristicsForDevice(id);
+        const services = await deviceChars.services();
+        const serviceUUIDs = services.map(service => service.uuid);
+        return toBLEDeviceVM({ ...device, serviceUUIDs });
+    } catch (error: any) {
+        throw new Error(error.toString);
+    }
+});
+```
+
+When the desired BLE device has been found, the `connectDeviceById` thunk may be dispatched by
+providing the ID of the scanned device. This function handles pairing with the device, as well
+as detecting all the characteristics and services we have programmed into our BLE server. 
+Because Redux is designed to work with serializable data a mapper function, `toBLEDeviceVM`,
+is used to extract the fields we are interested in before returning the object. The
+`disconnectDevice` function simply disconnects the connected BLE device and resets the device 
+state in the Redux store.
+
+The final step to complete our Redux implementation is to wrap our application with the Redux 
+store provider in the `navigation/indtex.tsx` file:
+
+```
+...
+import store from '../store/store';
+import { Provider } from 'react-redux';
+
+export default function Providers() {
+    return (
+        <Provider store={store}>
+            <NativeBaseProvider>
+                ...
+            </NativeBaseProvider>
+        </Provider>
+    )
+}
+```
+
+To get the full benefits of TypeScript we will use 'typed' hooks, which we define in `hooks/hooks.ts`:
+
+```
+import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux'
+import type { RootState, AppDispatch } from '../store/store';
+
+// Use throughout app instead of plain `useDispatch` and `useSelector`
+export const useAppDispatch = () => useDispatch<AppDispatch>()
+export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
+```
+
+#### Step 7: The BLE component
 
 
