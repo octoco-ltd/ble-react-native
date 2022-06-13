@@ -7,6 +7,13 @@ export const screenWidth = Dimensions.get('screen').width;
 export const screenHeight = Dimensions.get('screen').height;
 export const isSmallDevice = windowWidth < 400;
 
+export const appColors = {
+    primary: '#007FFF',
+    primaryInactive: 'rgba(0,127,255,0.75)',
+    secondary: '#99FFFF',
+    error: '#fc6d47',
+}
+
 export const containerStyles = StyleSheet.create({
     base: {
         flex: 1,

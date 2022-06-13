@@ -142,7 +142,10 @@ Your project structure should now look similar to the tree below:
 It will be useful to define some styles that we use throughout the app. Create a new
 file `globalStyles.ts` within the *constants* folder and paste the following code:
 
+<div style="text-align: center; font-weight: bold">constants/globalSyles.ts</div>
+
 ```
+// constants/globalSyles.ts
 import { StyleSheet } from 'react-native';
 import { Dimensions } from 'react-native';
 
@@ -151,6 +154,13 @@ export const windowHeight = Dimensions.get('window').height;
 export const screenWidth = Dimensions.get('screen').width;
 export const screenHeight = Dimensions.get('screen').height;
 export const isSmallDevice = windowWidth < 400;
+
+export const appColors = {
+    primary: '#007FFF',
+    primaryInactive: 'rgba(0,127,255,0.75)',
+    secondary: '#99FFFF',
+    error: '#fc6d47',
+}
 
 export const containerStyles = StyleSheet.create({
     base: {
@@ -253,7 +263,6 @@ export const globalStyles = {
         ...toastStyles,
     }
 };
-
 ```
 
 Now, on to our screens. This simple app will consist of 2 screens, in a bottom tab navigator:
@@ -266,6 +275,8 @@ Within the *screens* folder we now create 2 new folders for our screens:
 
 Starting with the weight screen, within the *weight* directory, create a file
 `WeightScreen.tsx` and paste the following code:
+
+<div style="text-align: center; font-weight: bold">screens/weight/WeightScreen.tsx</div>
 
 ```
 import React from 'react';
@@ -286,6 +297,8 @@ export default WeightScreen;
 Similarly, for the BLE screen, within the *ble* directory create a file
 `BLEScreen.tsx` and paste the following code:
 
+<div style="text-align: center; font-weight: bold">screens/weight/BLEScreen.tsx</div>
+
 ```
 import React from 'react';
 import { Text, View } from 'react-native';
@@ -304,5 +317,108 @@ export default BLEScreen;
 
 #### Step 5: Navigation
 Now that we have a basic skeleton for our app, we can set up the navigation. The navigator
-will consist of 2 bottom tabs, one for each screen. Create a new file, `index.tsx`, in 
-the *navigation* folder.
+will consist of 2 bottom tabs, one for each screen. To set up our navigation stack, create
+2 new files in the *navigation* folder with the following content:
+
+<div style="text-align: center; font-weight: bold">navigation/AppStack.tsx</div>
+
+```
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaView, Text } from 'react-native';
+import { appColors, globalStyles } from '../constants/globalStyles';
+import WeightScreen from '../screens/weight/WeightScreen';
+import { Icon } from 'native-base';
+import { MaterialIcons } from "@expo/vector-icons";
+
+const Tab = createBottomTabNavigator();
+
+const TabStack = () => {
+    return (
+        <NavigationContainer>
+            <Tab.Navigator
+                screenOptions={{ headerShown: false, tabBarActiveBackgroundColor: appColors.primary, tabBarInactiveBackgroundColor: appColors.primaryInactive, tabBarHideOnKeyboard: true }}
+            >
+                <Tab.Screen
+                    name={'weight'}
+                    component={WeightScreen}
+                    options={{
+                        tabBarIcon: ({focused, color, size}) => {
+                            return <Icon as={MaterialIcons} name="home" size={focused? 7 : 6} color={'white'}/>;
+                        },
+                        tabBarLabel: ({focused}) => {
+                            return <Text style={{ color: 'white', fontSize: focused? 14 : 12, marginLeft: 10 }}>Weight</Text>;
+                        }
+                    }}
+                />
+                <Tab.Screen
+                    name={'ble'}
+                    component={WeightScreen}
+                    options={{
+                        tabBarIcon: ({focused, color, size}) => {
+                            return <Icon as={MaterialIcons} name="bluetooth" size={focused? 7 : 6} color={'white'}/>;
+                        },
+                        tabBarLabel: ({focused}) => {
+                            return <Text style={{ color: 'white', fontSize: focused? 14 : 12, marginLeft: 10 }}>BLE</Text>;
+                        }
+                    }}
+                />
+            </Tab.Navigator>
+        </NavigationContainer>
+    );
+};
+
+export const AppStack = () => {
+    return (
+        <SafeAreaView style={globalStyles.container.base}>
+            <TabStack />
+        </SafeAreaView>
+    );
+};
+```
+
+<div style="text-align: center; font-weight: bold">navigation/index.tsx</div>
+
+```
+import { NativeBaseProvider } from "native-base";
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native';
+import { AppStack } from './AppStack';
+
+export default function Providers() {
+    return (
+        <NativeBaseProvider>
+            <SafeAreaProvider>
+                <SafeAreaView style={{ flex: 1 }}>
+                    <AppStack />
+                </SafeAreaView>
+            </SafeAreaProvider>
+        </NativeBaseProvider>
+    )
+}
+```
+
+The last step required to finish our navigation setup is to update the `App.tsx` file as 
+follows:
+
+<div style="text-align: center; font-weight: bold">App.tsx</div>
+
+```
+import 'expo-dev-client';
+import Providers from './navigation';
+
+export default function App() {
+  return <Providers />
+}
+```
+
+That's it! Now we can open our app with working navigation using the custom dev client
+we have created, and it should look something like this:
+
+<img src="guide/assets/screenshot_1.jpg" style="align-self: center" height="500">
+
+#### Step 6: BLE Integration
+Now, for the main event, we will integrate the app with the BLE device. To ensure we have
+access to the BLE device from anywhere within the app, we will be managing the BLE 
+connections using Redux.
+
