@@ -83,6 +83,7 @@ export const cardStyles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: 'white',
+        width: '70%',
         borderRadius: 15,
         shadowColor: 'grey',
         shadowOffset: { width: 0, height: 0 },

@@ -31,6 +31,54 @@ to sample our data and stream the reading to our application in real time.
 ![img.png](guide/assets/SystemArchitectureDiagram.png)
 
 ## ESP32 Bluetooth Server
+To start this project, we will write the firmware for our BLE server. Because this guide
+is intended to be generic, I will not go into too much detail regarding the sensor used
+(HX711 load cell amplifier). The focus will be on the implementation of the BLE server.
+Feel free to use any other sensor you have available. Alternatively, you can also simply
+sample the ADC input if you do not have other sensors available.
+
+### BLE Theory
+If this is your first BLE project I highly recommend learning some basic theoretical concepts
+of BLE and how it works. A basic understanding of BLE theory will greatly assist you when 
+following this guide. There are many BLE learning resources available, depending on which
+level of depth you want to learn. For the purposes of this guide the 
+[Introduction to Bluetooth Low Energy](https://learn.adafruit.com/introduction-to-bluetooth-low-energy?view=all)
+post by Adafruit should give you enough insight. I also highly recommend the 
+[BLE C++ Guide](https://github.com/nkolban/esp32-snippets/blob/master/Documentation/BLE%20C%2B%2B%20Guide.pdf)
+by Neil Kolban, the author of the library we will be using. This guide will give some
+more insights into the BLE implementation from a firmware perspective, as it will be done in this
+guide.
+
+### Step 1: Hardware Setup
+For a detailed guide on setting up the load cells, please refer to the
+[Load Cell Amplifier HX711 Breakout Hookup Guide](https://learn.sparkfun.com/tutorials/load-cell-amplifier-hx711-breakout-hookup-guide)
+provided by SparkFun. The only thing to note for this guide is that the
+sensor 'CLK' and 'DAT' pins will be connected to GPIO pins 4 and 5 respectively.
+Feel free to use any other suitable pin and change the pin numbers in the upcoming code 
+accordingly.
+
+### Step 2: IDE Setup and Libraries
+For simplicity the firmware is implemented in the Arduino IDE, however you may use any
+IDE of your choice. The firmware has also been successfully implemented in PlatformIO.
+The external libraries required for this project, other than the HX711 library used in the
+load cell guide linked earlier, is the [ESP 32 Arduino](https://github.com/nkolban/ESP32_BLE_Arduino)
+by Neil Kolban. To use this library, in the Arduino IDE, select *Tools -> Manage Libraries...*
+and search for *bledevice*. Then install the library by Neil Kolban:
+![img.png](guide/assets/arduino_ide_ble.png)
+
+
+### Step 3: Firmware
+In the Arduino IDE create a new project: *ble-firmware.ino* (or *ble-firmware.cpp* for PlatformIO) and 
+include the required libraries:
+
+```
+#include <Arduino.h>
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEServer.h>
+#include <HX711.h>
+#include <Wire.h>
+```
 
 ## React Native Application
 Now that we have our basic BLE server running, let's build our client React application.
@@ -614,7 +662,7 @@ const BLEManager = () => {
 export default BLEManager;
 ```
 
-The manager consists of 3 `useEffect` hooks. The first hook subscribes to the `bleManager.onStateChange`
+The manager consists of three `useEffect` hooks. The first hook subscribes to the `bleManager.onStateChange`
 event. This allows us to update the state of the BLE network adapter in our Redux store. Tracking this
 state allows us to know, for example, whether bluetooth is available to make new connections.
 
@@ -641,3 +689,12 @@ export const AppStack = () => {
     );
 };
 ```
+
+#### Step 8: Completing the BLE Screen
+Now that the brunt of the work is done for managing BLE connectivity we can start implementing the BLE
+screen.
+
+## Resources
+### React Native GitHub Repository:
+https://github.com/octoco-ltd/ble-react-native.git
+
