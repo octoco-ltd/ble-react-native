@@ -72,12 +72,157 @@ In the Arduino IDE create a new project: *ble-firmware.ino* (or *ble-firmware.cp
 include the required libraries:
 
 ```
+//=========================
+// Libraries
+//=========================
+#include <Arduino.h>
 #include <Arduino.h>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <HX711.h>
 #include <Wire.h>
+```
+
+Our BLE server will only be transmitting weight data, therefore only 1 service is required, the 
+'SAMPLE_SERVICE', which relates to our sampling data. The only data we are sampling is a weight 
+measurement. Therefore, we only have a single characteristic for our sampling service - the load
+cell sampling characteristic 'SAMPLE_LOAD_CELLS'. You can use an online 
+[UUID generation tool](https://www.uuidgenerator.net/) to generate any two UUID values for the 
+service and characteristic. In this guide we will use the following values, which you can add to your
+code if you're following along, below the libraries:
+
+```
+// ...
+//=========================
+// Compiler Constants
+//=========================
+// SAMPLE Service
+#define SAMPLE_SERVICE_UUID "cb0f22c6-1000-4737-9f86-1c33f4ee9eea"
+#define SAMPLE_LOAD_CELLS_CHARACTERISTIC_UUID "cb0f22c6-1001-41a0-93d4-9025f8b5eafe"
+```
+
+Next, we define some global variables (refer to the code comments for clarity):
+```
+// ...
+//=========================
+// Device Instantiations
+//=========================
+// HX711 Load Cell Amplifier
+HX711 scale;
+
+//=========================
+// Global Variables
+//=========================
+float calibration_factor = -24000; // Follow the SparkFun guide to get this value
+bool client_is_connected = false; // Only sample when a client is connected
+// Load Cell Amplifier Pins. You can change this to match your setup
+const int HX711_DOUT = GPIO_NUM_5;
+const int HX711_CLK = GPIO_NUM_4;
+// BLE Server
+BLEServer *pServer; 
+// Characteristics: Load Cells
+BLECharacteristic *loadCellCharacteristic;
+
+//=========================
+// State Machine Flags
+//=========================
+bool load_cell_sampling_enabled = false; // Only sample the load cells if a client requested
+```
+
+To optimize power usage and performance, we define some flags which we will use in a 
+state machine in our loop code. For example, we use the `client_is_connected` flag
+to track when a client connects/disconnects. When no client is connected the device
+should remain in an idle state. When a client connects and requests notifications
+on our load cell sampling service the `load_cell_sampling_enabled` flag is enabled,
+indicating to our state machine that the load cell amplifier should be sampled and
+the BLE notifications should be triggered.
+
+Now, some configuration/setup is required to get everything working.
+Let's start with the BLE server. We need to initialize the BLE server on our device
+with a server name, create the server and then define a basic server callback which
+is triggered whenever a device connects and disconnects to our server:
+
+```
+void setupBLEServer(void)
+{
+  BLEDevice::init("BLE_SERVER");
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new BaseBLEServerCallbacks());
+}
+```
+
+We write the callback function for the server events by extending the base
+`BLEServerCallbacks` class provided by the BLE library:
+
+```
+class BaseBLEServerCallbacks : public BLEServerCallbacks
+// Callback triggered when a client device connects or disconnects
+{
+  void onConnect(BLEServer *pServer)
+  {
+    client_is_connected = true;
+    Serial.println("Device connected");
+  }
+
+  void onDisconnect(BLEServer *pServer)
+  {
+    client_is_connected = false;
+    Serial.println("Device disconnected");
+    // Restart advertising
+    pServer->getAdvertising()->start();
+  }
+};
+```
+
+As seen in the code, the `client_is_connected` flag is toggled depending on device
+connection status using this callback.
+
+With our server initiated, we can define the services and characteristics. We require 
+only a single sampling service containing the load cell sampling characteristic. The 
+characteristic will have a 'read' property (for manually requesting samples) as well as
+a 'notify' property which is used to provide realtime samples to the app. Whenever
+the 'notify' property is used, it is also important to assign a 'Client Characteristic 
+Configuration Descriptor' (CCCD) to that characteristic. The CCCD is an unsigned integer
+value which, amongst other things, is used to determine whether a client is subscribed
+to a notifier. We will later use this descriptor value to toggle load cell sampling.
+
+```
+void setupSampleService(void)
+{
+  BLEService *sampleService = pServer->createService(SAMPLE_SERVICE_UUID);
+
+  // Weight/Load Cell Sample Characteristic
+  loadCellCharacteristic = sampleService->createCharacteristic(
+      SAMPLE_LOAD_CELLS_CHARACTERISTIC_UUID,
+      BLECharacteristic::PROPERTY_READ |
+          BLECharacteristic::PROPERTY_NOTIFY);
+  loadCellCharacteristic->setCallbacks(new SampleLoadCellCallback());
+  loadCellCharacteristic->setValue("PENDING");
+
+  // -- create CCC descriptors for notification service and listener callbacks --
+  // Load Cell CCC descriptor
+  BLEDescriptor *pLoadCellCCCDescriptor = new BLEDescriptor((uint16_t)0x2902);
+  pLoadCellCCCDescriptor->setCallbacks(new LoadCellDescriptorCallback());
+  loadCellCharacteristic->addDescriptor(pLoadCellCCCDescriptor);
+
+  sampleService->start();
+}
+```
+
+The final step in setting up our BLE server is to set up and start the advertising.
+We will not be setting any custom advertisement data, but feel free to add some
+advertisement data to your own project:
+
+```
+void setupAdvertisementData(void)
+{
+  BLEAdvertising *pAdvertising = pServer->getAdvertising();
+  BLEAdvertisementData advertisementData;
+  // Set properties of advertisement data
+  pAdvertising->setAdvertisementData(advertisementData);
+  pAdvertising->start();
+}
 ```
 
 ## React Native Application

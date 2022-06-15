@@ -93,6 +93,9 @@ const BLEScreen = () => {
         if (bleDevice) {
             setIconName('bluetooth-connected');
             setStateText('Connected');
+            dispatch(stopDeviceScan({}));
+            setIsScanning(false);
+            setButtonText('Start Scan');
         }
         else if (isScanning) {
             setStateText('Scanning...')
