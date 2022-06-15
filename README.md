@@ -68,6 +68,7 @@ and search for *bledevice*. Then install the library by Neil Kolban:
 
 
 ### Step 3: Firmware
+
 In the Arduino IDE create a new project: *ble-firmware.ino* (or *ble-firmware.cpp* for PlatformIO) and 
 include the required libraries:
 
@@ -224,6 +225,90 @@ void setupAdvertisementData(void)
   pAdvertising->start();
 }
 ```
+
+Our Bluetooth scale setup is almost complete! We just need to set up the scale:
+
+```
+void setupLoadCells(void)
+{
+  pinMode(HX711_CLK, OUTPUT);
+  pinMode(HX711_DOUT, INPUT);
+
+  scale.begin(HX711_DOUT, HX711_CLK);
+  scale.set_scale(calibration_factor);
+  scale.tare(); // Reset the scale to 0
+
+  long zero_factor = scale.read_average(); // Get a baseline reading
+  Serial.println("setupLoadCells setup: SUCCESS");
+}
+```
+
+That's it! To wrap it up, we place the setup calls in the `setup()` function
+provided by the Arduino template:
+
+```
+void setup()
+{
+  // Setup USB Serial
+  Serial.begin(115200);
+
+  // Setup HX711 and Load Cells
+  Serial.println("--Setting up HX711--");
+  setupLoadCells();
+
+  // Setup BLE
+  Serial.println("--Setting up BLE Server--");
+  setupBLEServer();
+  setupSampleService();
+  setupAdvertisementData();
+
+  Serial.println("--Setup Complete--");
+}
+```
+
+The operation of the BLE server is perhaps best expressed visually, 
+using a high level finite state machine (FSM) diagram:
+
+![img.png](guide/assets/ble-flow.png)
+
+With this in mind, we can implement the `loop()` function as a **very** simple FSM:
+
+```
+void loop()
+{
+  if (client_is_connected)
+  // Do nothing if no client is connected
+  {
+    stateMachine();
+  }
+}
+
+void stateMachine(void)
+{
+  if (load_cell_sampling_enabled)
+  {
+    notifyWeight();
+  }
+}
+```
+
+The `notifyWeight()` function simply samples the weight sensor and updates the BLE
+notifier with the latest sample value:
+
+```
+void notifyWeight(void)
+{
+  float weight = scale.get_units(5);
+  loadCellCharacteristic->setValue(weight);
+  loadCellCharacteristic->notify();
+}
+```
+
+Using this modular FSM architecture we can easily add new functionality or 
+sensors in future iterations.
+
+That is our entire BLE firmware done. For the full code example refer to the GitHub project
+linked at the end of this guide.
 
 ## React Native Application
 Now that we have our basic BLE server running, let's build our client React application.
