@@ -7,7 +7,6 @@ import { BleError, BleManager, Characteristic, Subscription } from 'react-native
 import { useToast } from 'native-base';
 import bleServices from '../../constants/bleServices';
 import { Buffer } from 'buffer';
-import PrimaryButton from '../../components/button/PrimaryButton';
 
 const bleManager = new BleManager();
 let MAX_WEIGHT = 2; // Maximum expected weight in kg. Used for visuals only
@@ -50,8 +49,6 @@ const WeightScreen = (props: { navigation: any }) => {
 
     let weightMonitorSubscription: Subscription;
 
-    const toast = useToast();
-
     const weightMonitorCallbackHandler = (bleError: BleError | null, characteristic: Characteristic | null) => {
         if (characteristic?.value){
             const res = Buffer.from(characteristic.value, 'base64').readFloatLE();
@@ -59,41 +56,10 @@ const WeightScreen = (props: { navigation: any }) => {
         }
     }
 
-    const reconnectHandler = async () => {
-        try {
-            if (device?.id) {
-                const char = await bleManager.readCharacteristicForDevice(device.id, bleServices.sample.SAMPLE_SERVICE_UUID, bleServices.sample.SAMPLE_LOAD_CELLS_CHARACTERISTIC_UUID);
-                await bleManager.monitorCharacteristicForDevice(device.id, bleServices.sample.SAMPLE_SERVICE_UUID, bleServices.sample.SAMPLE_LOAD_CELLS_CHARACTERISTIC_UUID, weightMonitorCallbackHandler)
-                if (char.value){
-                    const res = Buffer.from(char.value, 'base64').readFloatLE();
-                    console.log('res: ', res);
-                }
-            }
-        }
-        catch (error: any) {
-            if (error.toString().includes('not connected')) {
-                if (device) {
-                    console.log('reconnecting')
-                    await bleManager.connectToDevice(device.id);
-                    await bleManager.discoverAllServicesAndCharacteristicsForDevice(device.id);
-                }
-            }
-            else {
-                console.log(error);
-            }
-        }
-    }
-
     useEffect(() => {
         if (device?.id) {
             console.log('Registered notification callback')
             weightMonitorSubscription = bleManager.monitorCharacteristicForDevice(device.id, bleServices.sample.SAMPLE_SERVICE_UUID, bleServices.sample.SAMPLE_LOAD_CELLS_CHARACTERISTIC_UUID, weightMonitorCallbackHandler)
-        }
-        else {
-            toast.show({
-                description: `No device connected`,
-                ...globalStyles.toast.default,
-            });
         }
 
         // Remove characteristic monitoring subscriptions

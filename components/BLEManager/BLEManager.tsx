@@ -13,6 +13,7 @@ import {
 import * as Location from 'expo-location';
 import { useToast } from 'native-base';
 import { globalStyles } from '../../constants/globalStyles';
+import bleServices from '../../constants/bleServices';
 
 const bleManager = new BleManager();
 let device: Device;
@@ -34,10 +35,17 @@ const BLEManager = () => {
 
     const checkDevices = async () => {
         if (connectedDevice && !device) {
-            console.log('BLEManager: Creating new device');
-            device = await bleManager.connectToDevice(connectedDevice.id);
-            const subscription = device.onDisconnected(disconnectCallback);
-            setSubscriptions(prevState => [...prevState, subscription])
+            const devices = await bleManager.connectedDevices([bleServices.sample.SAMPLE_SERVICE_UUID]);
+            device = devices[0];
+            if (device) {
+                const subscription = device.onDisconnected(disconnectCallback);
+                setSubscriptions(prevState => [...prevState, subscription]);
+            }
+            else {
+                device = await bleManager.connectToDevice(connectedDevice.id);
+                const subscription = device.onDisconnected(disconnectCallback);
+                setSubscriptions(prevState => [...prevState, subscription]);
+            }
         }
     }
 

@@ -1,32 +1,33 @@
-# Building a BLE live data feed application with React Native and ESP32
+# Building a live data feed BLE application with React Native and ESP32
 ## Overview
 Getting started with a BLE project and don’t know where to start? Search no further.
 In this code-along tutorial we will be developing a simple, yet thorough, BLE project
 that will teach you everything you need to know in order to get started on your own
 BLE projects with minimal effort. While keeping things simple and to the point, this 
-guide will still apply best practices, ensuring you can easily scale and build upon what
+guide aims to apply best practices, ensuring you can easily scale and build upon what
 you have learnt.
 
 In this guide, we will be using an ESP32 microcontroller connected to an HX711 load cell
 amplifier to collect our live data - however any other type of sensor can be used with 
-minimal code adjustment. You can even do this tutorial without any external sensor and 
+minimal code adjustments. You can even do this tutorial without any external sensor and 
 simply sample values from the ADC. For the mobile application, we will be using React 
-Native (usingTypeScript) and the [react-native-ble-plx](https://dotintent.github.io/react-native-ble-plx/) 
+Native (with TypeScript) and the [react-native-ble-plx](https://dotintent.github.io/react-native-ble-plx/) 
 library for bluetooth integration. A link to the GitHub repo containing the final React Native code and
 C++ firmware is provided at the end of this article.
 
 ## Requirements
 This guide will be kept as generic as possible to ensure that you can easily swap 
-out components with whatever your project requirements are.
+out components with whatever your project requirements are. The following components
+are used in this guide:
 - ESP32-S3 (or any other BLE enabled MCU supported by the Arduino framework)
 - Physical Android or iOS device (simulators are not supported)
-- HX711 load cell amplifier with 4 load cells (Optional)
+- HX711 load cell amplifier with a load sensor (Optional)
 
 ## System Architecture
 A high level system architecture diagram is shown below. The diagram consists of a 
 physical mobile device running our React Native application, connected to the ESP32 via 
 a BLE connection. The ESP32 is connected to our load cell amplifier via an I2C connection
-to sample our data and stream the reading to our application in real time.
+to sample our data and stream the samples to our application in real time.
 
 ![img.png](guide/assets/SystemArchitectureDiagram.png)
 
@@ -52,17 +53,17 @@ guide.
 ### Step 1: Hardware Setup
 For a detailed guide on setting up the load cells, please refer to the
 [Load Cell Amplifier HX711 Breakout Hookup Guide](https://learn.sparkfun.com/tutorials/load-cell-amplifier-hx711-breakout-hookup-guide)
-provided by SparkFun. The only thing to note for this guide is that the
-sensor 'CLK' and 'DAT' pins will be connected to GPIO pins 4 and 5 respectively.
+provided by SparkFun. The only particular thing to note for this guide is that the
+HX711 'CLK' and 'DAT' pins will be connected to GPIO pins 4 and 5 respectively.
 Feel free to use any other suitable pin and change the pin numbers in the upcoming code 
 accordingly.
 
 ### Step 2: IDE Setup and Libraries
-For simplicity the firmware is implemented in the Arduino IDE, however you may use any
+For simplicity, the firmware is implemented in the Arduino IDE. However, you may use any
 IDE of your choice. The firmware has also been successfully implemented in PlatformIO.
 The external libraries required for this project, other than the HX711 library used in the
-load cell guide linked earlier, is the [ESP 32 Arduino](https://github.com/nkolban/ESP32_BLE_Arduino)
-by Neil Kolban. To use this library, in the Arduino IDE, select *Tools -> Manage Libraries...*
+load cell guide linked earlier, is the [ESP32 BLE Arduino](https://github.com/nkolban/ESP32_BLE_Arduino)
+library by Neil Kolban. To use this library, in the Arduino IDE, select *Tools -> Manage Libraries...*
 and search for *bledevice*. Then install the library by Neil Kolban:
 ![img.png](guide/assets/arduino_ide_ble.png)
 
@@ -85,7 +86,7 @@ include the required libraries:
 #include <Wire.h>
 ```
 
-Our BLE server will only be transmitting weight data, therefore only 1 service is required, the 
+Our BLE server will only be transmitting weight data, therefore only 1 BLE service is required, the 
 'SAMPLE_SERVICE', which relates to our sampling data. The only data we are sampling is a weight 
 measurement. Therefore, we only have a single characteristic for our sampling service - the load
 cell sampling characteristic 'SAMPLE_LOAD_CELLS'. You can use an online 
@@ -132,12 +133,17 @@ bool load_cell_sampling_enabled = false; // Only sample the load cells if a clie
 ```
 
 To optimize power usage and performance, we define some flags which we will use in a 
-state machine in our loop code. For example, we use the `client_is_connected` flag
-to track when a client connects/disconnects. When no client is connected the device
+finite state machine in our loop code. For example, we use the `client_is_connected` 
+flag to track when a client connects/disconnects. When no client is connected the device
 should remain in an idle state. When a client connects and requests notifications
 on our load cell sampling service the `load_cell_sampling_enabled` flag is enabled,
 indicating to our state machine that the load cell amplifier should be sampled and
 the BLE notifications should be triggered.
+
+The operation of the BLE server is perhaps best expressed visually,
+using a high level finite state machine (FSM) diagram:
+
+![img.png](guide/assets/ble-flow.png)
 
 Now, some configuration/setup is required to get everything working.
 Let's start with the BLE server. We need to initialize the BLE server on our device
@@ -147,7 +153,7 @@ is triggered whenever a device connects and disconnects to our server:
 ```
 void setupBLEServer(void)
 {
-  BLEDevice::init("BLE_SERVER");
+  BLEDevice::init("BLE_SERVER"); // Initialize server with a name
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new BaseBLEServerCallbacks());
 }
@@ -202,13 +208,28 @@ void setupSampleService(void)
   loadCellCharacteristic->setValue("PENDING");
 
   // -- create CCC descriptors for notification service and listener callbacks --
-  // Load Cell CCC descriptor
   BLEDescriptor *pLoadCellCCCDescriptor = new BLEDescriptor((uint16_t)0x2902);
   pLoadCellCCCDescriptor->setCallbacks(new LoadCellDescriptorCallback());
   loadCellCharacteristic->addDescriptor(pLoadCellCCCDescriptor);
 
   sampleService->start();
 }
+```
+
+The `SampleLoadCellCallback` is triggered whenever we want to make a single weight
+sampling request manually and simply updates the characteristic with the weight value:
+
+
+```
+class SampleLoadCellCallback : public BLECharacteristicCallbacks
+{
+  void onRead(BLECharacteristic *pCharacteristic)
+  {
+    float weight = scale.get_units();
+    pCharacteristic->setValue(weight);
+  }
+};
+
 ```
 
 The final step in setting up our BLE server is to set up and start the advertising.
@@ -237,9 +258,6 @@ void setupLoadCells(void)
   scale.begin(HX711_DOUT, HX711_CLK);
   scale.set_scale(calibration_factor);
   scale.tare(); // Reset the scale to 0
-
-  long zero_factor = scale.read_average(); // Get a baseline reading
-  Serial.println("setupLoadCells setup: SUCCESS");
 }
 ```
 
@@ -266,12 +284,8 @@ void setup()
 }
 ```
 
-The operation of the BLE server is perhaps best expressed visually, 
-using a high level finite state machine (FSM) diagram:
-
-![img.png](guide/assets/ble-flow.png)
-
-With this in mind, we can implement the `loop()` function as a **very** simple FSM:
+With reference to the FSM diagram shown earlier, we can implement the `loop()`
+function as a **very** simple FSM:
 
 ```
 void loop()
@@ -318,14 +332,14 @@ For this project, we will be using Expo to manage our application.
 To get started, create a new folder for the project and name it *ble-react-native*. You may
 also use an alternative name if you wish.
 Within this new folder, open a terminal or command window to initialize the project
-using the official [Expo TypeScript template](https://docs.expo.dev/guides/typescript/#starting-from-scratch-using-a-typescript-template)
+using the official [Expo TypeScript template](https://docs.expo.dev/guides/typescript/#starting-from-scratch-using-a-typescript-template).
 To do this, simply type `expo init -t expo-template-blank-typescript` in the terminal and
 run the command. When prompted to give your project a name you can use any name that you 
 prefer - for this project the name will be *ble-react-native*. 
 Once the project is created, open the project folder in your IDE of choice.
 
 ### Step 2: Libraries
-Because bluetooth functionality is not included within the Expo Go client by default,
+Because Bluetooth functionality is not included within the Expo Go client by default,
 we need to build our own development client to use BLE functionality - described
 in the next section. The downside of this is that we need to rebuild the dev client
 every time we add new native libraries. To avoid this, let's add all the libraries
@@ -368,11 +382,11 @@ yarn add native-base
 expo install react-native-svg
 ```
 
-### Step 3: Create custom dev client
+### Step 3: Create the custom dev client
 Typical development using the default Expo Go application from the app store will not
 work for our BLE application, because the required bluetooth libraries are not shipped
 with the Expo Go app. Therefore, we need to build our own custom dev client.
-To get started, install the dev client library
+To get started, install the dev client library:
 ```
 expo install expo-dev-client
 ```
@@ -404,9 +418,9 @@ Your project structure should now look similar to the tree below:
 |
 ├── constants                  # Main app screens we navigate between
 |
-├── navigation                 # React Navigation controllers
-|
 ├── hooks                      # Custom hooks
+|
+├── navigation                 # React Navigation controllers
 |
 ├── screens                    # Main app screens we navigate between
 |
@@ -595,8 +609,8 @@ export default BLEScreen;
 
 #### Step 5: Navigation
 Now that we have a basic skeleton for our app, we can set up the navigation. The navigator
-will consist of 2 bottom tabs, one for each screen. To set up our navigation stack, create
-2 new files in the *navigation* folder with the following content:
+will consist of a bottom tab with two tabs, one for each screen. To set up our navigation stack, create
+two new files in the *navigation* folder with the following content:
 
 <div style="text-align: center; font-weight: bold">navigation/AppStack.tsx</div>
 
@@ -715,8 +729,8 @@ Your *store* directory should now have the following structure, with the complet
 └── store.ts                
 ```
 
-Taking a look at the code in our `bleSlice.ts` file, we can see 3 `asyncThunks` (simply put, [thunks](https://redux-toolkit.js.org/api/createAsyncThunk) 
-are the recommended way to implement async functions in our redux slices, which can be dispatched):
+Taking a look at the code in our `bleSlice.ts` file, we can see three `asyncThunks` (simply put, [thunks](https://redux-toolkit.js.org/api/createAsyncThunk) 
+are the recommended way to implement async functions in our Redux slices, which can be dispatched):
 
 ```
 export const scanBleDevices = createAsyncThunk('ble/scanBleDevices', async (_, thunkAPI) => {
@@ -735,7 +749,7 @@ export const scanBleDevices = createAsyncThunk('ble/scanBleDevices', async (_, t
     }
 });
 ```
-The `scanBleDevices` function will start the `startDeviceScan` subscription, which return a BLE
+The `scanBleDevices` function will start the `startDeviceScan` subscription, which returns a BLE
 device whenever it is detected. Thereafter, we compare the detected device name to our expected
 BLE server name (BLE_SERVER) and dispatch `addScannedDevice` to add the device to our store,
 along with other servers which may have the same name. 
@@ -760,7 +774,7 @@ export const connectDeviceById = createAsyncThunk('ble/connectDeviceById', async
 When the desired BLE device has been found, the `connectDeviceById` thunk may be dispatched by
 providing the ID of the scanned device. This function handles pairing with the device, as well
 as detecting all the characteristics and services we have programmed into our BLE server. 
-Because Redux is designed to work with serializable data a mapper function, `toBLEDeviceVM`,
+Because Redux is designed to work with serializable data, a mapper function `toBLEDeviceVM`
 is used to extract the fields we are interested in before returning the object. The
 `disconnectDevice` function simply disconnects the connected BLE device and resets the device 
 state in the Redux store.
@@ -829,6 +843,7 @@ import {
 import * as Location from 'expo-location';
 import { useToast } from 'native-base';
 import { globalStyles } from '../../constants/globalStyles';
+import bleServices from '../../constants/bleServices';
 
 const bleManager = new BleManager();
 let device: Device;
@@ -850,10 +865,17 @@ const BLEManager = () => {
 
     const checkDevices = async () => {
         if (connectedDevice && !device) {
-            console.log('BLEManager: Creating new device');
-            device = await bleManager.connectToDevice(connectedDevice.id);
-            const subscription = device.onDisconnected(disconnectCallback);
-            setSubscriptions(prevState => [...prevState, subscription])
+            const devices = await bleManager.connectedDevices([bleServices.sample.SAMPLE_SERVICE_UUID]);
+            device = devices[0];
+            if (device) {
+                const subscription = device.onDisconnected(disconnectCallback);
+                setSubscriptions(prevState => [...prevState, subscription]);
+            }
+            else {
+                device = await bleManager.connectToDevice(connectedDevice.id);
+                const subscription = device.onDisconnected(disconnectCallback);
+                setSubscriptions(prevState => [...prevState, subscription]);
+            }
         }
     }
 
@@ -922,9 +944,321 @@ export const AppStack = () => {
 
 #### Step 8: Completing the BLE Screen
 Now that the brunt of the work is done for managing BLE connectivity we can start implementing the BLE
-screen.
+screen. Replace the code in the `BLEScreen.tsx` file with the following code:
+
+<div style="text-align: center; font-weight: bold">screens/weight/BLEScreen.tsx</div>
+
+```
+import React, { useEffect, useState } from 'react';
+import { FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { appColors, globalStyles, windowWidth } from '../../constants/globalStyles';
+import PrimaryButton from '../../components/button/PrimaryButton';
+import { useAppDispatch, useAppSelector } from '../../hooks/hooks';
+import {
+    connectDeviceById, scanBleDevices,
+    selectAdapterState,
+    selectConnectedDevice,
+    selectScannedDevices, stopDeviceScan
+} from '../../store/ble/bleSlice';
+import { IBLEDevice } from '../../store/ble/bleSlice.contracts';
+import { Icon, useToast } from 'native-base';
+import { MaterialIcons } from '@expo/vector-icons';
+
+interface DeviceItemProps {
+    device: IBLEDevice | null
+}
+
+const DeviceItem = (props: DeviceItemProps) => {
+    const { device } = props;
+    const [isConnecting, setIsConnecting] = useState(false);
+    const connectedDevice = useAppSelector(selectConnectedDevice)
+    const dispatch = useAppDispatch();
+
+    const toast = useToast();
+
+    const connectHandler = async () => {
+        if (isConnecting) return;
+        if (device?.id){
+            setIsConnecting(true);
+            const result = await dispatch(connectDeviceById({ id: device?.id }))
+            if (result.meta.requestStatus === 'fulfilled') {
+                toast.show({
+                    description: 'Connection successful',
+                    ...globalStyles.toast.default,
+                });
+            }
+            else if (result.meta.requestStatus === 'rejected') {
+                toast.show({
+                    description: 'Connection unsuccessful',
+                    ...globalStyles.toast.default,
+                });
+            }
+            setIsConnecting(false);
+        }
+        else {
+            toast.show({
+                description: 'Connection unsuccessful (No ID)',
+                ...globalStyles.toast.default,
+            });
+        }
+    }
+
+    return (
+        <TouchableOpacity style={{ ...globalStyles.card.shadow, width: windowWidth*0.8, backgroundColor: (connectedDevice?.id === device?.id)? 'green' : 'white' }} onPress={connectHandler}>
+            <Text style={{ ...globalStyles.text.p, paddingVertical: 10 }}>{device?.name}</Text>
+        </TouchableOpacity>
+    )
+}
+
+const BLEScreen = () => {
+    const [buttonText, setButtonText] = useState('Start Scan');
+    const [isScanning, setIsScanning] = useState(false);
+    const [iconName, setIconName] = useState('bluetooth-disabled');
+    const [stateText, setStateText] = useState('');
+    const bleDevice = useAppSelector(selectConnectedDevice);
+    const adapterState = useAppSelector(selectAdapterState);
+    const scannedDevices = useAppSelector(selectScannedDevices).devices;
+    const toast = useToast();
+    const dispatch = useAppDispatch();
+
+    const scanPressHandler = () => {
+        if (isScanning) {
+            dispatch(stopDeviceScan({}));
+            setIsScanning(false);
+            setButtonText('Start Scan');
+        }
+        else if (adapterState.toLowerCase() === 'poweredon') {
+            dispatch(scanBleDevices());
+            setIsScanning(true);
+            setButtonText('Stop Scan');
+        }
+        else {
+            toast.show({
+                description: stateText,
+                ...globalStyles.toast.default,
+            });
+        }
+    }
+
+    useEffect(() => {
+        if (bleDevice) {
+            setIconName('bluetooth-connected');
+            setStateText('Connected');
+            dispatch(stopDeviceScan({}));
+            setIsScanning(false);
+            setButtonText('Start Scan');
+        }
+        else if (isScanning) {
+            setStateText('Scanning...')
+        }
+        else {
+            switch (adapterState.toLowerCase()) {
+                case 'poweredoff':
+                    setIconName('bluetooth-disabled');
+                    setStateText('Bluetooth Disabled');
+                    break;
+                case 'poweredon':
+                    setIconName('bluetooth');
+                    setStateText('Ready To Connect');
+                    break;
+                default:
+                    setStateText(adapterState);
+                    setIconName('bluetooth-disabled');
+                    break;
+            }
+        }
+    }, [adapterState, bleDevice, isScanning]);
+
+    return (
+        <View style={globalStyles.container.spacedBetween}>
+            <View style={globalStyles.card.shadow}>
+                <View style={globalStyles.div.row}>
+                    <Text style={{ ...globalStyles.text.p, color: appColors.primary }}>{stateText}</Text>
+                    <Icon as={MaterialIcons} name={iconName} color={appColors.primary} size={7}/>
+                </View>
+            </View>
+            {(scannedDevices?.length > 0) &&
+                <Text style={{ ...globalStyles.text.p, color: 'grey', textAlign: 'center' }}>Select a device below to connect.</Text>
+            }
+            <FlatList
+                style={{ height: '100%' }}
+                contentContainerStyle={{ width: '100%', justifyContent: 'center' }}
+                data={scannedDevices}
+                renderItem={({ item }) => (
+                    <DeviceItem device={item} />
+                )}
+                />
+            <PrimaryButton text={buttonText} style={{ marginBottom: 10 }} onPress={scanPressHandler} loading={isScanning} />
+        </View>
+    );
+};
+
+export default BLEScreen;
+```
+
+Once the app reloads, the screen should look like the screenshot below:
+
+<img src="guide/assets/screenshot_ble1.jpg" style="align-self: center" height="500">
+
+Let's take a look at the code you just copied. In our main component we have a single `useEffect` hook.
+This hook is triggered by any changes in our `bleDevice` or `adapterState` state, as well as the
+`isScanning` flag. Here we set some values for our rendered components. Most notably, the status card
+seen at the top of the screenshot (which currently displays 'Bluetooth Disabled' with a crossed out 
+Bluetooth icon). Here we simply inform the user of the adapter state (whether Bluetooth is enabled)
+as well as any changes to the BLE connection state.
+
+Ensure that your device has Bluetooth turned on and that the MCU running our BLE firmware code is powered on.
+Once we press the 'Start Scan' button at the bottom of the screen we dispatch the `scanBleDevices` 
+function in our Redux store. As soon as our 'BLE_SERVER' is detected, it should be listed as shown in the
+screenshot below:
+
+<img src="guide/assets/screenshot_ble2.jpg" style="align-self: center" height="500">
+
+Click on the 'BLE_SERVER' list item to start the connection. Once connected a toast message will pop up
+indicating a successful connection (or inversely an unsuccessful connection) and the scanning will stop.
+The connected device details should now be available in our Redux store. It is highly recommended
+to use the standalone [React Native debugger](https://github.com/jhen0409/react-native-debugger) app,
+especially if you run into any issues. Ensure that the device shows up in your Redux store:
+
+<img src="guide/assets/redux-screenshot.png" style="align-self: center" height="500">
+
+We are now able to connect to the BLE device using our React Native application!
+The last remaining step is to collect realtime data from the device and display it in a fun way!
+We will do this by completing the weight screen. After completing this section we will have a live 
+weight sampling feed with a cool animation of a bubble that grows as the sampled weight increases:
+
+![](guide/assets/ble-react-native.gif)
+
+Replace the code in the `WeightScreen.tsx` file with the following code:
+
+```
+import React, { useEffect, useState } from 'react';
+import { Text, View } from 'react-native';
+import { appColors, globalStyles, screenWidth } from '../../constants/globalStyles';
+import { useAppSelector } from '../../hooks/hooks';
+import { selectConnectedDevice } from '../../store/ble/bleSlice';
+import { BleError, BleManager, Characteristic, Subscription } from 'react-native-ble-plx';
+import { useToast } from 'native-base';
+import bleServices from '../../constants/bleServices';
+import { Buffer } from 'buffer';
+
+const bleManager = new BleManager();
+let MAX_WEIGHT = 2; // Maximum expected weight in kg. Used for visuals only
+MAX_WEIGHT = MAX_WEIGHT*1000;
+
+interface WeightWidgetProps {
+    weight: number | null
+}
+
+const WeightWidget = (props: WeightWidgetProps) => {
+    const { weight } = props;
+    const [renderedWeight, setRenderedWeight] = useState<string>('');
+    const [ratio, setRatio] = useState(0);
+    const MAX_SIZE = screenWidth*0.8
+
+    useEffect(() => {
+        if (weight) {
+            setRatio(weight / MAX_WEIGHT);
+            setRenderedWeight(Math.round(weight).toString())
+        }
+        console.log(MAX_WEIGHT)
+    }, [weight]);
+
+    return (
+        <View style={{
+            alignItems: 'center', justifyContent: 'center', backgroundColor: `rgba(25,180,${ratio*255}, ${ratio})`,
+            height: ratio*MAX_SIZE, width: ratio*MAX_SIZE, borderRadius: (ratio*MAX_SIZE)/2,
+            minHeight: 20, minWidth: 20
+        }}>
+            <View style={{ ...globalStyles.div.centered, height: 30, width: 50, backgroundColor: appColors.primary, borderRadius: 5 }}>
+                <Text style={{ ...globalStyles.text.p, color: 'white', textAlign: 'center' }}>{renderedWeight}g</Text>
+            </View>
+        </View>
+    )
+}
+
+const WeightScreen = (props: { navigation: any }) => {
+    const [weight, setWeight] = useState<number | null>(null)
+    const device = useAppSelector(selectConnectedDevice);
+
+    let weightMonitorSubscription: Subscription;
+
+    const weightMonitorCallbackHandler = (bleError: BleError | null, characteristic: Characteristic | null) => {
+        if (characteristic?.value){
+            const res = Buffer.from(characteristic.value, 'base64').readFloatLE();
+            setWeight(res*1000);
+        }
+    }
+
+    useEffect(() => {
+        if (device?.id) {
+            console.log('Registered notification callback')
+            weightMonitorSubscription = bleManager.monitorCharacteristicForDevice(device.id, bleServices.sample.SAMPLE_SERVICE_UUID, bleServices.sample.SAMPLE_LOAD_CELLS_CHARACTERISTIC_UUID, weightMonitorCallbackHandler)
+        }
+
+        // Remove characteristic monitoring subscriptions
+        return function cleanupSubscriptions() {
+            if (weightMonitorSubscription) {
+                weightMonitorSubscription.remove();
+            }
+        };
+    }, [props.navigation, device]);
+
+    if (device?.id) {
+        return (
+            <View style={globalStyles.container.center}>
+                {weight && <WeightWidget weight={weight}/>}
+            </View>
+        )
+    }
+    return (
+        <View style={globalStyles.container.center}>
+            <Text style={globalStyles.text.emptyText}>No device connected</Text>
+        </View>
+    );
+};
+
+export default WeightScreen;
+```
+
+Looking at the code, we have a `WeightWidget` component which displays the current weight reading, with the
+'growing bubble' background. In the main `WeightScreen` component we select the BLE device from the 
+Redux store:
+```
+const device = useAppSelector(selectConnectedDevice);
+```
+The `useEffect` hook will be triggered whenever a navigation event occurs, or a device connection occurs.
+If the device is connected (i.e. `device.id` is defined) we register the `weightMonitorCallbackHandler`
+callback to be fired whenever a change occurs in the device sampling characteristic:
+```
+weightMonitorSubscription = bleManager.monitorCharacteristicForDevice(device.id, bleServices.sample.SAMPLE_SERVICE_UUID, bleServices.sample.SAMPLE_LOAD_CELLS_CHARACTERISTIC_UUID, weightMonitorCallbackHandler)
+```
+This effectively subscribes our application to the weight sampling notifier, which changes the sampling CCCD
+as mentioned in the firmware section. With this subscription called, sampling and notifying is enabled on
+the MCU and the sample characteristic value is updated with the latest weight sample as it is
+measured in realtime.
+
+To extract this value in our application we need to convert the raw hexadecimal value received to a float
+value which we can use in our application. This is achieved using the `Buffer` class:
+```
+const res = Buffer.from(characteristic.value, 'base64').readFloatLE();
+```
+
+Your application should now be able to sample and display the weight reading in real time as shown in
+the GIF above.
+
+## Conclusion
+We have implemented a BLE server using the Arduino framework which samples weight values in realtime
+using the ESP32 microcontroller. Thereafter, we have successfully implemented a React Native application
+which can connect to the BLE server to read and display the weight samples to Android and iOS users in realtime.
+
+Thanks for reading this guide. May it guide you well in all your future BLE projects!
+
+Feel free to clone the full GitHub repos listed under the 'Resources' section if you got stuck!
 
 ## Resources
 ### React Native GitHub Repository:
-https://github.com/octoco-ltd/ble-react-native.git
+https://github.com/octoco-ltd/ble-react-native
 
+### C++ Firmware GitHub Repository:
+https://github.com/octoco-ltd/ble-firmware
